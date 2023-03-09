@@ -11,5 +11,5 @@ def portCanUse(hostName, port):
         return portCanUse(hostName, port + 1)
     else:
         sock.close()
-        print("port can use", port)
+        # print("port can use", port)
         return port
