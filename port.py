@@ -13,5 +13,3 @@ def portCanUse(hostName, port):
         sock.close()
         print("port can use", port)
         return port
-
-# portCanUse('127.0.0.1', 1234)
