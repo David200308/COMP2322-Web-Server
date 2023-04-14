@@ -3,11 +3,6 @@ import time
 import threading
 import os
 import sys
-from port import portCanUse
-
-HOST = '127.0.0.1'
-PORT = 8080
-PORT = portCanUse(HOST, PORT)
 
 ## To check the port is used or not, if used +1 and recheck, if not return and use it.
 def portCanUse(hostName, port):
@@ -18,6 +13,10 @@ def portCanUse(hostName, port):
     else:
         sock.close()
         return port
+
+HOST = '127.0.0.1'
+PORT = 8080 
+PORT = portCanUse(HOST, PORT)
 
 ## set the http header and log the head to file
 def getHeader(statusCode, fileType):
