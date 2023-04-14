@@ -4,6 +4,8 @@ import threading
 import os
 import sys
 
+timeNow = ""
+
 ## To check the port is used or not, if used +1 and recheck, if not return and use it.
 def portCanUse(hostName, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -19,17 +21,22 @@ PORT = 8080
 PORT = portCanUse(HOST, PORT)
 
 ## set the http header and log the head to file
-def getHeader(statusCode, fileType):
+def getHeader(statusCode, fileType, lastModTime):
    header = ''
-   time_now = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+   timeNow = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
 
    if statusCode == 200:
       header += 'HTTP/1.1 200 OK\n'
    elif statusCode == 404:
-      header += 'HTTP/1.1 404 Not Found\n'
+      header += 'HTTP/1.1 404 File Not Found\n'
+   elif statusCode == 400:
+      header += 'HTTP/1.1 400 Bad Request\n'
+   elif statusCode == 304:
+      header += 'HTTP/1.1 304 Not Modified\n'
       
-   header += 'Date: ' + time_now + '\n'
+   header += 'Date: ' + timeNow + '\n'
    header += 'Connection: keep-alive\n'
+   header += 'Last-Modified: ' + lastModTime + '\n'
 
    if fileType == 'html':
       header += 'Content-Type: text/html\n\n'
@@ -45,18 +52,23 @@ def getHeader(statusCode, fileType):
    logHeaderStr = ''
    for i in range(len(headerArg) - 2):
       logHeaderStr += '[' + headerArg[i] + ']'
+   
    logFile = open((os.getcwd() + "/log.txt"), "a")
    logFile.write(logHeaderStr + '\n')
    logFile.close()
 
    return header
 
+def lastModDate(filename):
+    s = os.path.getmtime(filename)
+    return time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(s))
+
 
 def webServer(Socket, address):
    perConnection = False
    while True:
       try:
-         msg = Socket.recv(1024).decode()  
+         msg = Socket.recv(4096).decode()
 
          ## If no msg recieved, will be close connection
          if not msg:  
@@ -94,55 +106,74 @@ def webServer(Socket, address):
             ## load and serve file content
             ## if try to get a html/text file request from client
             ## Success --> 200 OK, send header and file source (endcoded) to client
-            ## Fail --> 404 Not Found, send header to client
+            ## Fail --> 404 File Not Found, send header to client
+            ##      --> 400 Bad Request, send header to client
+            ##      --> 304 Not Modified, send header to client
             if fileType == 'html':
                try:
+                  lastModTime = lastModDate(filePath)
                   if requestMethod == "GET":
                      file = open(filePath, 'r')
                      responseData = file.read()
                      file.close()
-                  responseHeader = getHeader(200, fileType)
+                  responseHeader = getHeader(200, fileType, lastModTime)
                   statusCode = 200
                except Exception as e:
-                  print("HTML/Text not found, 404 file not found")
-                  responseHeader = getHeader(404, fileType)
-                  statusCode = 404
+                  if (os.path.exists(file) == False):
+                     print("404 File Not Found")
+                     responseHeader = getHeader(404, fileType, 'N/A')
+                     statusCode = 404
+                  elif(lastModTime > timeNow):
+                     print("304 Not Modified")
+                     responseHeader = getHeader(304, fileType, 'N/A')
+                     statusCode = 304
+                  else:
+                     print("400 Bad Request")
+                     responseHeader = getHeader(400, fileType, 'N/A')
+                     statusCode = 400
 
-               # If request was GET and requested file was read successfully, append the file to the response header
                if requestMethod == "GET" and statusCode == 200:
                   print("Header: \n" + responseHeader)
-                  # Encode the response in bytes format so can be sent to client
                   Socket.send(responseHeader.encode() + responseData.encode())
-               # Else simply return the response header (HEAD request - 200/404)
+                  
                else:
                   print("Header: \n" + responseHeader)
                   Socket.send(responseHeader.encode())
             ## if try to get a image file request from client
             elif fileType == "jpg" or fileType == "jpeg" or fileType == "png":
                try:
+                  lastModTime = lastModDate(filePath)
                   if requestMethod == "GET":
                      file = open(filePath, 'rb')
                      responseData = file.read()
                      file.close()
-                  responseHeader = getHeader(200, fileType)
+                  responseHeader = getHeader(200, fileType, lastModTime)
                   statusCode = 200
                except Exception as e:
-                  print("Image not found, 404 file not found")
-                  responseHeader = getHeader(404, fileType)
-                  statusCode = 404
+                  if(os.path.exists(file) == False):
+                     print("404 File Not Found")
+                     responseHeader = getHeader(404, fileType, 'N/A')
+                     statusCode = 404
+                  elif(lastModTime > timeNow):
+                     print("304 Not Modified")
+                     responseHeader = getHeader(304, fileType, 'N/A')
+                     statusCode = 304
+                  else:
+                     print("400 Bad Request")
+                     responseHeader = getHeader(400, fileType, 'N/A')
+                     statusCode = 400
 
                ## If request was GET and status is 200 OK, stock will send header and image to client
                if requestMethod == "GET" and statusCode == 200:
-                  print("Sending image with: \n" + responseHeader)
+                  print("Header: \n" + responseHeader)
                   Socket.send(responseHeader.encode())
                   Socket.send(responseData)
                else:
                   print("Header: \n" + responseHeader)
                   Socket.send(responseHeader.encode())
-            # Else trying to request/open an invalid file type
             else:
-               print("Invalid Requested Filetype: " + fileType)
-               responseHeader = getHeader(404, fileType)
+               print("Invalid Requested: " + fileType)
+               responseHeader = getHeader(404, fileType, 'N/A')
                print("Header: \n" + responseHeader)
                Socket.send(responseHeader.encode())
 
@@ -150,7 +181,6 @@ def webServer(Socket, address):
             if perConnection == True:
                print("Continuing to recieve requests...")
          else:
-            print("Error: Unknown HTTP request method: " + requestMethod)
             print("Closing client socket...")
             Socket.close()
             break
