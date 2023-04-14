@@ -36,6 +36,7 @@ def getHeader(statusCode, fileType, lastModTime):
       
    header += 'Date: ' + timeNow + '\n'
    header += 'Connection: keep-alive\n'
+   header += 'Keep-Alive: timeout=10, max=100\n'
    header += 'Last-Modified: ' + lastModTime + '\n'
 
    if fileType == 'html':
