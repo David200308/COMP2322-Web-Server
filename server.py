@@ -70,6 +70,13 @@ def webServer(Socket, address):
    while True:
       try:
          msg = Socket.recv(4096).decode()
+         # print(msg)
+         array = msg.split('\n')
+         if ('If-Modified-Since:' in msg):
+            temp = array[-3].split(' ')[1:]
+            modifTimeFromCache = " ".join(temp)
+            modifTimeFromCache = modifTimeFromCache.split('\r')[0]
+            print("If-Modified-Since: " + modifTimeFromCache)
 
          ## If no msg recieved, will be close connection
          if not msg:  
@@ -124,7 +131,7 @@ def webServer(Socket, address):
                      print("404 File Not Found")
                      responseHeader = getHeader(404, fileType, 'N/A')
                      statusCode = 404
-                  elif(lastModTime > timeNow):
+                  elif(lastModTime > modifTimeFromCache):
                      print("304 Not Modified")
                      responseHeader = getHeader(304, fileType, 'N/A')
                      statusCode = 304
@@ -155,7 +162,7 @@ def webServer(Socket, address):
                      print("404 File Not Found")
                      responseHeader = getHeader(404, fileType, 'N/A')
                      statusCode = 404
-                  elif(lastModTime > timeNow):
+                  elif(lastModTime > modifTimeFromCache):
                      print("304 Not Modified")
                      responseHeader = getHeader(304, fileType, 'N/A')
                      statusCode = 304
